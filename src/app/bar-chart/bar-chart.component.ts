@@ -1,5 +1,6 @@
 import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
 import * as d3 from 'd3';
+import { from } from 'rxjs';
 
 @Component({
   selector: 'app-bar-chart',
@@ -9,80 +10,98 @@ import * as d3 from 'd3';
 export class BarChartComponent implements OnInit {
 
   @ViewChild('chart') chartContainer: ElementRef;
-  data: any;
 
   constructor() { }
 
   ngOnInit() {
-    this.data = [
-      {
-        letter: 'A',
-        frequency: 5
-      },
-      {
-        letter: 'B',
-        frequency: 1
-      },
-      {
-        letter: 'C',
-        frequency: 2
-      }
-    ];
-    let margin = {top: 30, right: 20, bottom: 30, left: 40};
     d3.select('svg').remove();
 
-    // make new svg
-    const element = this.chartContainer.nativeElement;
-    const svg = d3.select(element).append('svg')
-      .attr('height', element.offsetHeight)
-      .attr('width', element.offsetWidth);
+    const margin = { top: 10, right: 10, left: 100, bottom: 150 };
 
-    const contentWidth = element.offsetWidth - margin.left - margin.right;
-    const contentHeight = element.offsetHeight - margin.top - margin.bottom;
-    
-    // configure x-axis data & re-scale them
-    const x = d3
-      .scaleBand()
-      .rangeRound([0, contentWidth])
-      .padding(0.1)
-      .domain(this.data.map(d => d.letter));
+    const width = 600 - margin.left - margin.right;
+    const height = 400 - margin.top - margin.bottom;
 
-    // configure y-axis data & re-scale them
-    const y = d3
-      .scaleLinear()
-      .rangeRound([contentHeight, 0])
-      .domain([0, d3.max(this.data, d => +d["frequency"])]);
+    const g = d3.select(this.chartContainer.nativeElement)
+      .append('svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
+        .append('g')
+        .attr('transform', 'translate(' + margin.left + ', ' + margin.top + ')');
 
-    // add an SVG Group
-    const g = svg.append('g')
-      .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+    g.append('text')
+      .attr('class', 'x axis-label')
+      .attr('x', 250)
+      .attr('y', height + 140)
+      .attr('font-size', '20px')
+      .attr('text-anchor', 'middle')
+      .text("The world's tallest buildings");
 
-    // append x-axis to the group
-    g.append('g')
-      .attr('class', 'axis axis--x')
-      .attr('transform', 'translate(0,' + contentHeight + ')')
-      .call(d3.axisBottom(x));
+    g.append('text')
+      .attr('class', 'x axis-label')
+      .attr('x', - (height / 2))
+      .attr('y', -60)
+      .attr('font-size', '20px')
+      .attr('text-anchor', 'middle')
+      .attr('transform', 'rotate(-90)')
+      .text("Height (m)");
 
-    // append y-axis to the group
-    g.append('g')
-      .attr('class', 'axis axis--y')
-      .call(d3.axisLeft(y).tickFormat((d) => d + "m").ticks(5))
-      .append('text')
-        .attr('transform', 'rotate(-90)')
-        .attr('y', 6)
-        .attr('dy', '0.71em')
-        .attr('text-anchor', 'end')
-        .text('Frequency');
+    from(d3.json('assets/data/buildings.json')).subscribe((data: any[]) => {
+      console.log(data);
 
-    // add all the bars
-    g.selectAll('.bar')
-      .data(this.data)
-      .enter().append('rect')
-        .attr('class', 'bar')
-        .attr('x', d => x(d["letter"]))
-        .attr('y', d => y(d["frequency"]))
-        .attr('width', x.bandwidth())
-        .attr('height', d => contentHeight - y(d["frequency"]));
+      data.forEach(d => {
+        d.height = +d.height;
+      });
+
+      const x = d3.scaleBand()
+        .domain(data.map(d => d.name))
+        .range([0, width])
+        .padding(0.3);
+
+      const y = d3.scaleLinear()
+        .domain([0, d3.max(data, d => d.height)])
+        .range([height, 0]);
+
+      const xAxis = d3.axisBottom(x);
+
+      g.append('g')
+        .attr('class', 'x axis')
+        .attr('transform', 'translate(0, ' + height + ')')
+        .call(xAxis)
+          .selectAll('text')
+          .attr('y', '10')
+          .attr('x', '-5')
+          .attr('text-anchor', 'end')
+          .attr('transform', 'rotate(-40)');
+
+      const yAxis = d3.axisLeft(y).tickFormat(d => d + "m");
+
+      g.append('g')
+        .attr('class', 'y-axis')
+        .call(yAxis);
+
+      const legend_height = ["height"];
+
+      const legend = g.append('g')
+        .attr('transform', 'translate(' + (width - 10) + ', ' + (height - 125) + ')');
+
+      
+
+      const rects = g.selectAll('rect')
+        .data(data);
+      
+      rects
+        .enter()
+        .append('rect')
+        .attr('y', d => y(d.height))
+        .attr('x', (d) => {
+          return x(d.name)
+        })
+        .attr('width', x.bandwidth)
+        .attr('height', (d) => {
+          return height - y(d.height);
+        })
+        .attr('fill', (d) => "grey");
+    });
   }
 
 }
